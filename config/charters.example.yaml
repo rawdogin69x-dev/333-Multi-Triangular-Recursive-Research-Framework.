@@ -1,0 +1,13 @@
+# Copy to config/charters.yaml (git-ignored) and load with: akashic charters --load config/charters.yaml
+# A charter is a research question with a scope and a definition of done. The Steward only forages for active charters.
+charters:
+  # DEFAULT (assumption A1 in docs/ASSUMPTIONS.md): the system first researches its own design,
+  # so Phase 1 output is immediately useful for building Phases 2 to 5. Replace with your own question any time.
+  - question: "Which methods most reliably extract faithful, atomic claims from web pages and papers with local LLMs?"
+    scope: "Open-weight models up to about 30B total parameters; 2024 onwards; English sources"
+    priority: 1
+    done_when: "At least 30 CORROBORATED genes covering extraction prompts, grammars, and verification methods"
+  - question: "How should near-duplicate, refining and contradicting claims be told apart automatically?"
+    scope: "Embedding similarity, NLI models, LLM judges; evaluation results with numbers"
+    priority: 2
+    done_when: "A calibrated recommendation with corroborated accuracy figures"
