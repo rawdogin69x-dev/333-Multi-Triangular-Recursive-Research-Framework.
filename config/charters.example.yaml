@@ -1,0 +1,16 @@
+# Copy to config/charters.yaml (git-ignored) and load with: akashic charters --load config/charters.yaml
+# A charter is a research question with a scope and a definition of done. The Steward only forages for active charters.
+charters:
+  # Decision D8 (docs/DECISIONS.md): begin with the system's own epistemology.
+  - question: "How can machine-assisted research know that it knows: extract faithfully, judge fairly, connect truly?"
+    scope: "Claim extraction, dedup/contradiction judging, source independence, calibration; 2020 onwards"
+    priority: 1
+    done_when: "Corroborated, connected genes covering each of the three verbs, with calibration evidence"
+  - question: "Which methods most reliably extract faithful, atomic claims from web pages and papers with local LLMs?"
+    scope: "Open-weight models up to about 30B total parameters; 2024 onwards; English sources"
+    priority: 2
+    done_when: "At least 30 CORROBORATED genes covering extraction prompts, grammars, and verification methods"
+  - question: "How should near-duplicate, refining and contradicting claims be told apart automatically?"
+    scope: "Embedding similarity, NLI models, LLM judges; evaluation results with numbers"
+    priority: 3
+    done_when: "A calibrated recommendation with corroborated accuracy figures"

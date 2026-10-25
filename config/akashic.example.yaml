@@ -1,0 +1,25 @@
+# Copy to config/akashic.yaml (git-ignored) and edit. Every number is a starting guess, calibrated in Phase 2.
+db_path: data/akashic_core.db
+blob_dir: data/blobs
+embed_dims: 1024            # BGE-M3 dense and Qwen3-Embedding-0.6B are both 1024-d
+default_source_reliability: 0.5
+tombstone_days: 90
+max_forage_cycles: 2
+
+gravity:
+  tau0: 0.60                # support needed in an empty topic
+  gamma: 0.03               # how fast the bar rises with settled mass
+  tau_max: 0.95
+  k_base: 2                 # independent lineages needed in an empty topic
+  k_cap: 4                  # never demand more than this
+  holds: 0.50               # a side "holds" at this score (four-valued truth)
+  topic_depth: 2            # 'sci.ml.rag.dedup' -> topic 'sci.ml'
+
+weights:                    # evidence type (pramana) -> weight
+  EXECUTED: 0.95
+  OBSERVED: 0.85
+  INFERRED: 0.60
+  ABSENCE: 0.50
+  TESTIMONY: 0.50
+  ABDUCTION: 0.35
+  ANALOGY: 0.20

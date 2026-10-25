@@ -5,3 +5,22 @@ So recursive accurate and triangularine through connection . This will promote a
 The knowledge in the system should grow multifaceted. Visually, raw sqlite +/ our vectorized database format (RAW akashic records). So we create entire genes of research not just raw book we never finish. But chronological and implementable insights and nuance deep critical juice. 
 
 We must also find a safe way to have an auto agent 24/7 do things or  source pick etc and manage which local or cloud agent and how the hive thinks (multi agents). Efficiency, 4070rtx 96gb ddr 5 ram +  API limitations/codex/claude/antigravity.
+
+---
+
+## Status
+
+Phase 0 (foundations) is in progress. `Argon-research.md` was the first design draft; its admission
+gate is replaced by the evidence-based design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+- [Architecture](docs/ARCHITECTURE.md): admission law, gravity rule, lifecycle, frames
+- [Roadmap](docs/ROADMAP.md): phases and the gate each must pass
+- [Assumptions](docs/ASSUMPTIONS.md): defaults in force until changed
+- [Self-critique](docs/SELF_CRITIQUE.md): known weak points and mitigations
+- [Setup](docs/SETUP.md): WSL2, llama.cpp, Python, benchmark
+
+```bash
+uv venv && uv pip install -e ".[dev]" && .venv/bin/pytest -q
+.venv/bin/akashic init
+.venv/bin/akashic gravity sci.ml.rag
+```
