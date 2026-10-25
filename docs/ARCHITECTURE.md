@@ -76,5 +76,20 @@ writes knowledge tables. One GPU means one resident LLM: a day model for extract
 a large MoE with experts in system RAM at night. Cloud APIs only for CONTESTED genes and for
 writing verification tests, under hard spend caps; tests run in a local, network-less container.
 
+## The ingest path (Phase 1, in code)
+
+| Step | Module | What it guarantees |
+| --- | --- | --- |
+| Forage | `forage.py` | robots.txt and per-host pacing; canonical URL; raw bytes kept in a content-addressed blob store; injection phrases flagged; local file paths never stored |
+| Distil | `distill.py` | source wrapped as untrusted data; percept first (phenomenon, then quote, then thesis); GBNF grammar fixes the JSON shape; malformed claims dropped, not repaired |
+| Anchor | `anchor.py`, `Store.anchor_check` | quote must appear verbatim; numbers in the thesis must appear in the source |
+| Embed + search | `embed.py`, `search.py` | thesis + scope embedded; hybrid FTS5 + vector search fused by reciprocal rank |
+| Judge | `judge.py`, `ingest.py` | steelman both claims first; unsure SAME becomes RELATED (D14); different frames only get PARALLELS |
+| Gate | `store.py`, `lifecycle.py` | evidence + connection (D1), lineages merged on shared passages (D9), gravity |
+| Recall | `brief.py`, `maintenance.py` | folded brief with ids; Rückschau replays re-checks newest first; daily digest |
+
+Every model call goes through `llm.Gateway`, which logs it to `agent_runs` and refuses a cloud
+provider whose monthly cap is 0 or spent.
+
 See `docs/ROADMAP.md` for phases, `docs/DECISIONS.md` for design rulings, and `docs/ASSUMPTIONS.md` for
 defaults on facts only the owner can supply.

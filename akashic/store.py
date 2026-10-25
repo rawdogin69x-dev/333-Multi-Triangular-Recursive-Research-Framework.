@@ -219,6 +219,48 @@ class Store:
                  topic_of(g["taxonomy"], self.cfg.gravity.topic_depth)),
             )
 
+    def merge_into(self, duplicate_id: str, target_id: str, why: str = "SAME") -> State:
+        """Judge said SAME: the duplicate's evidence becomes corroboration of the target."""
+        with tx(self.conn):
+            self.conn.execute("UPDATE OR IGNORE evidence SET gene_id = ? WHERE gene_id = ?", (target_id, duplicate_id))
+            self.conn.execute("UPDATE genes SET state = 'SUPERSEDED', updated_at = ? WHERE gene_id = ?",
+                              (now(), duplicate_id))
+            self._event("MERGED", duplicate_id, after={"into": target_id, "why": why})
+        return self.reassess(target_id)
+
+    def refine(self, candidate_id: str, target_id: str, why: str = "REFINES") -> State:
+        """Judge said REFINES: the candidate's content becomes the target's next version (old versions stay)."""
+        v = self.conn.execute(
+            """SELECT v.* FROM gene_versions v JOIN genes g ON g.gene_id = v.gene_id
+               AND v.version = g.current_version WHERE g.gene_id = ?""", (candidate_id,)).fetchone()
+        cur_v = self.conn.execute(
+            """SELECT v.* FROM gene_versions v JOIN genes g ON g.gene_id = v.gene_id
+               AND v.version = g.current_version WHERE g.gene_id = ?""", (target_id,)).fetchone()
+        nxt = cur_v["version"] + 1
+        with tx(self.conn):
+            self.conn.execute(
+                """INSERT INTO gene_versions(gene_id, version, thesis, reason, example, application, scope, nuance,
+                       rule, prediction, valid_from, valid_until, author, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (target_id, nxt, v["thesis"], v["reason"], v["example"], v["application"], v["scope"], v["nuance"],
+                 v["rule"], v["prediction"], v["valid_from"], v["valid_until"], v["author"], now()),
+            )
+            self.conn.execute("UPDATE genes SET current_version = ?, updated_at = ? WHERE gene_id = ?",
+                              (nxt, now(), target_id))
+            # Contentless FTS5: delete needs the indexed values, which the old version still holds.
+            rowid = self.conn.execute("SELECT rowid FROM gene_fts_map WHERE gene_id = ?", (target_id,)).fetchone()[0]
+            self.conn.execute(
+                "INSERT INTO gene_fts(gene_fts, rowid, thesis, reason, nuance, scope) VALUES ('delete', ?, ?, ?, ?, ?)",
+                (rowid, cur_v["thesis"], cur_v["reason"], cur_v["nuance"] or "", cur_v["scope"]))
+            self.conn.execute(
+                "INSERT INTO gene_fts(rowid, thesis, reason, nuance, scope) VALUES (?, ?, ?, ?, ?)",
+                (rowid, v["thesis"], v["reason"], v["nuance"] or "", v["scope"]))
+            self.conn.execute("UPDATE OR IGNORE evidence SET gene_id = ? WHERE gene_id = ?", (target_id, candidate_id))
+            self.conn.execute("UPDATE genes SET state = 'SUPERSEDED', updated_at = ? WHERE gene_id = ?",
+                              (now(), candidate_id))
+            self._event("REFINED", target_id, before=nxt - 1, after={"version": nxt, "from": candidate_id, "why": why})
+        return self.reassess(target_id)
+
     # -- admission ----------------------------------------------------------
     def anchor_check(self, gene_id: str) -> State:
         """Step 1: CANDIDATE -> HYPOTHESIS, or REJECTED with a named reason."""
@@ -266,7 +308,7 @@ class Store:
             JOIN genes o ON o.gene_id = CASE WHEN e.src = :g THEN e.dst ELSE e.src END
             WHERE (e.src = :g OR e.dst = :g)
               AND e.rel != 'PARALLELS'
-              AND o.frame != 'METAPHOR' AND o.state != 'REJECTED'
+              AND o.frame != 'METAPHOR' AND o.state NOT IN ('REJECTED', 'SUPERSEDED')
             LIMIT 1"""
         if self.conn.execute(q, {"g": gene_id}).fetchone():
             return True

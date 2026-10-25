@@ -31,6 +31,26 @@ Weak points in our own plan, ranked by how much damage they could do, with the m
 9. **Time estimates in the roadmap are optimistic.** They assume AI-assisted coding and no
    detours. Treat gates, not dates, as the commitment.
 
+10. **Opaque sources need four lineages (D10).** A source with no transparency signals starts at
+    r = 0.3, so two observed lineages reach support ≈ 0.45 and three ≈ 0.59, under τ = 0.6.
+    This is intended (show your data or bring more witnesses) but slows honest prose sources
+    such as books. *Mitigation:* predictions resolved in the source's favour raise r; the owner
+    can record transparency by hand.
+11. **The transparency heuristic is gameable.** Six regexes (data, code, methods, DOI,
+    supplements, sample size) reward boilerplate. *Mitigation:* it is only a prior with weight 4
+    against resolved predictions, and it is logged so a Librarian can audit outliers.
+12. **Shared-passage merging can over-merge.** Two sources quoting the same famous sentence share
+    8-word shingles and become one lineage. That errs towards caution (D9), but it undercounts
+    genuine replications that cite the original wording. *Mitigation:* measure on the Phase 2
+    audit set; restrict the check to the evidence quote's surrounding passage if it misfires.
+13. **`judge_floor` is uncalibrated.** Cosine thresholds differ by embedder; 0.80 is a guess for
+    BGE-M3. Too high and duplicates slip in as new genes; too low and the judge is flooded.
+    *Mitigation:* Roadmap step 3 above; until then, re-ingesting is idempotent and merges are logged.
+14. **Prompt injection reaches the distiller.** Sources are wrapped as data and flagged phrases are
+    warned, but a local model may still obey them. *Mitigation:* the grammar fixes the output shape
+    and every claim must anchor to a verbatim quote, so injected text can at worst become a quoted,
+    single-lineage hypothesis.
+
 ## Bugs caught so far
 
 - A once-settled gene that slipped to `CONTESTED` could then be refuted with one fewer lineage
@@ -39,3 +59,6 @@ Weak points in our own plan, ranked by how much damage they could do, with the m
   `test_entrenched_gene_needs_extra_lineage_to_fall`.
 - A gene's own support counted towards the topic mass it was judged against, so a settled
   gene raised its own bar on every re-check (caught in code review). `Store.reassess` now subtracts it.
+- Two transparent-looking test sources failed to corroborate once D10 landed: the test texts had
+  no transparency markers, so each counted at r = 0.3. The engine was right; the test now gives
+  its sources data, code and n, and `test_opaque_sources_need_more_lineages` pins the opaque case.

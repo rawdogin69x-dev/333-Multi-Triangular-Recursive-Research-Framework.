@@ -8,6 +8,7 @@ from akashic.lifecycle import (
     Truth,
     assess,
     derived_support,
+    source_reliability,
     k_required,
     next_state,
     tau,
@@ -131,3 +132,13 @@ def test_reliability_ignores_agreement_and_learns_from_predictions():
     assert source_reliability(None) == 0.5
     # a transparent source whose predictions keep failing loses trust
     assert source_reliability(1.0, hits=1, resolved=10) < source_reliability(0.0)
+
+
+def test_opaque_sources_need_more_lineages():
+    """D10 consequence: with no transparency signals each source starts at r=0.3, so two observed
+    lineages reach only ~0.45 and stay a hypothesis; four are needed in an empty topic."""
+    r = source_reliability(0.0)
+    two = assess([row(x, r=r) for x in ("a", "b")], W)
+    four = assess([row(x, r=r) for x in ("a", "b", "c", "d")], W)
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", two, 0.0, G, connected=True) == State.HYPOTHESIS
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", four, 0.0, G, connected=True) == State.CORROBORATED

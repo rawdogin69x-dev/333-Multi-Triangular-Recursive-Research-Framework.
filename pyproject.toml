@@ -12,6 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+pdf = ["pypdf>=4.0"]
 
 [project.scripts]
 akashic = "akashic.cli:main"
