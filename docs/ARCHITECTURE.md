@@ -37,6 +37,7 @@ k_req = min(4, 2 + floor(log10(1 + M_d)))   independent lineages
 support ≥ τ_d = min(0.95, 0.60 + 0.03 · ln(1 + M_d))
 ```
 
+Promotion also needs at least one typed connection into the library (D1: evidence **and** connection).
 So a new topic needs 2 lineages, a topic with 10 settled genes needs 3, one with 100 needs 4.
 Overturning a once-settled gene needs `k_req + 1` lineages against. See `akashic/lifecycle.py`.
 
@@ -50,7 +51,7 @@ to a gene queues `RECHECK` tasks for genes that `DEPENDS_ON` or are `DERIVED_FRO
 ## Frames
 
 Every gene has a frame: `EMPIRICAL`, `FORMAL`, `ATTRIBUTED` (what a person, text or tradition
-holds), `SPECULATIVE`, `METAPHOR`. `SPECULATIVE` and `METAPHOR` genes never rise above
+holds), `SPECULATIVE`, `METAPHOR`, `PHENOMENOLOGICAL` (careful first-person reports, D6). `SPECULATIVE` and `METAPHOR` genes never rise above
 HYPOTHESIS. Links across frames use `PARALLELS`, so traditional and esoteric material can be
 studied beside empirical work without lending it confidence.
 
@@ -75,4 +76,5 @@ writes knowledge tables. One GPU means one resident LLM: a day model for extract
 a large MoE with experts in system RAM at night. Cloud APIs only for CONTESTED genes and for
 writing verification tests, under hard spend caps; tests run in a local, network-less container.
 
-See `docs/ROADMAP.md` for phases and `docs/ASSUMPTIONS.md` for the defaults chosen so far.
+See `docs/ROADMAP.md` for phases, `docs/DECISIONS.md` for design rulings, and `docs/ASSUMPTIONS.md` for
+defaults on facts only the owner can supply.
