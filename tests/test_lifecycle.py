@@ -8,6 +8,7 @@ from akashic.lifecycle import (
     Truth,
     assess,
     derived_support,
+    source_reliability,
     k_required,
     next_state,
     tau,
@@ -49,7 +50,7 @@ def test_gravity_rises_with_mass():
 def test_cold_start_admits_with_two_independent_sources():
     """Argon's gate could never admit the first gene. This one can."""
     a = assess([row("a.org"), row("b.org")], W)
-    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a, 0.0, G) == State.CORROBORATED
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a, 0.0, G, connected=True) == State.CORROBORATED
 
 
 def test_one_source_stays_hypothesis():
@@ -61,14 +62,15 @@ def test_dense_topic_needs_more_lineages():
     a = assess([row("a.org"), row("b.org")], W)
     assert next_state(State.HYPOTHESIS, "EMPIRICAL", a, 50.0, G) == State.HYPOTHESIS
     a3 = assess([row("a.org"), row("b.org"), row("c.org")], W)
-    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a3, 50.0, G) == State.CORROBORATED
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a3, 50.0, G, connected=True) == State.CORROBORATED
 
 
 def test_metaphor_and_speculative_never_corroborate():
     a = assess([row(x) for x in "abcd"], W)
     for frame in ("METAPHOR", "SPECULATIVE"):
-        assert next_state(State.HYPOTHESIS, frame, a, 0.0, G) == State.HYPOTHESIS
-    assert next_state(State.HYPOTHESIS, "ATTRIBUTED", a, 0.0, G) == State.CORROBORATED
+        assert next_state(State.HYPOTHESIS, frame, a, 0.0, G, connected=True) == State.HYPOTHESIS
+    for frame in ("ATTRIBUTED", "PHENOMENOLOGICAL"):
+        assert next_state(State.HYPOTHESIS, frame, a, 0.0, G, connected=True) == State.CORROBORATED
 
 
 def test_both_sides_strong_is_contested():
@@ -96,3 +98,47 @@ def test_terminal_and_derived_states_do_not_move():
 def test_derived_is_capped_by_weakest_premise():
     assert derived_support([0.9, 0.4, 0.8]) == 0.4
     assert derived_support([]) == 0.0
+
+
+def test_evidenced_orphan_waits_until_connected():
+    """D1: truth needs evidence AND connection."""
+    a = assess([row("a.org"), row("b.org"), row("c.org")], W)
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a, 0.0, G, connected=False) == State.HYPOTHESIS
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", a, 0.0, G, connected=True) == State.CORROBORATED
+
+
+PASSAGE = ("The committee found that the new filter reduced false positives by a third across all "
+           "twelve regional test sites during the trial period")
+
+
+def test_syndicated_passage_counts_as_one_lineage():
+    """D9: two domains quoting the same passage are one lineage."""
+    rows = [EvidenceRow("a.org", "FOR", "OBSERVED", 0.8, True, PASSAGE),
+            EvidenceRow("b.net", "FOR", "OBSERVED", 0.8, True, "Report: " + PASSAGE + ", officials said.")]
+    assert assess(rows, W).lineages_for == 1
+
+
+def test_different_passages_stay_independent():
+    rows = [EvidenceRow("a.org", "FOR", "OBSERVED", 0.8, True, PASSAGE),
+            EvidenceRow("b.net", "FOR", "OBSERVED", 0.8, True,
+                        "Our independent replication in two hospitals saw false alarms fall from 90 to 61 per month")]
+    assert assess(rows, W).lineages_for == 2
+
+
+def test_reliability_ignores_agreement_and_learns_from_predictions():
+    from akashic.lifecycle import source_reliability
+    opaque, open_ = source_reliability(0.0), source_reliability(1.0)
+    assert opaque < open_
+    assert source_reliability(None) == 0.5
+    # a transparent source whose predictions keep failing loses trust
+    assert source_reliability(1.0, hits=1, resolved=10) < source_reliability(0.0)
+
+
+def test_opaque_sources_need_more_lineages():
+    """D10 consequence: with no transparency signals each source starts at r=0.3, so two observed
+    lineages reach only ~0.45 and stay a hypothesis; four are needed in an empty topic."""
+    r = source_reliability(0.0)
+    two = assess([row(x, r=r) for x in ("a", "b")], W)
+    four = assess([row(x, r=r) for x in ("a", "b", "c", "d")], W)
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", two, 0.0, G, connected=True) == State.HYPOTHESIS
+    assert next_state(State.HYPOTHESIS, "EMPIRICAL", four, 0.0, G, connected=True) == State.CORROBORATED

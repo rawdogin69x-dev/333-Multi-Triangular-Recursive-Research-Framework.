@@ -23,3 +23,37 @@ weights:                    # evidence type (pramana) -> weight
   TESTIMONY: 0.50
   ABDUCTION: 0.35
   ANALOGY: 0.20
+
+pipeline:
+  distill_provider: local-day
+  judge_provider: local-day
+  judge_floor: 0.80         # cosine; only neighbours this close are sent to the judge. Calibrate per embedder
+  min_confidence_same: 0.75 # D14: an unsure SAME/REFINES becomes RELATED
+  neighbours: 5
+  max_claims_per_chunk: 8
+  use_grammar: true         # llama.cpp GBNF forces the exact JSON shape
+  min_fetch_interval_s: 5.0 # per host
+
+# OpenAI-compatible servers. Keys are read from environment variables named here, never stored.
+providers:
+  local-day:
+    base_url: http://127.0.0.1:8080/v1
+    model: local-day
+    local: true
+  local-night:
+    base_url: http://127.0.0.1:8080/v1   # llama-swap swaps the model behind one port
+    model: local-night
+    local: true
+  # Cloud is disabled until you set a cap above 0 (assumption A2). Example:
+  # anthropic:
+  #   base_url: https://api.anthropic.com/v1   # via an OpenAI-compatible proxy
+  #   model: <model id>
+  #   local: false
+  #   api_key_env: ANTHROPIC_API_KEY
+  #   monthly_cap_usd: 0
+  #   usd_per_mtok_in: 0
+  #   usd_per_mtok_out: 0
+
+embedder:
+  base_url: http://127.0.0.1:8081/v1
+  model: bge-m3

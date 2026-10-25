@@ -1,4 +1,5 @@
--- Akashic core schema v1. Nothing is hard-deleted; states and versions carry history.
+-- Akashic core schema v1 (amended before first release to carry decisions D1-D14, docs/DECISIONS.md).
+-- Nothing is hard-deleted; states and versions carry history.
 -- All timestamps are ISO-8601 UTC strings. Vector + FTS tables are created in db.py
 -- because their shape depends on config (embedding dims).
 
@@ -18,7 +19,8 @@ CREATE TABLE genes (
     gene_id          TEXT PRIMARY KEY,                -- UUIDv7, time-ordered
     current_version  INTEGER NOT NULL DEFAULT 1,
     taxonomy         TEXT NOT NULL,                   -- dotted, e.g. 'sci.ml.rag.dedup'
-    frame            TEXT NOT NULL CHECK (frame IN ('EMPIRICAL', 'FORMAL', 'ATTRIBUTED', 'SPECULATIVE', 'METAPHOR')),
+    frame            TEXT NOT NULL CHECK (frame IN (
+                        'EMPIRICAL', 'FORMAL', 'ATTRIBUTED', 'SPECULATIVE', 'METAPHOR', 'PHENOMENOLOGICAL')),
     state            TEXT NOT NULL DEFAULT 'CANDIDATE' CHECK (state IN (
                         'CANDIDATE', 'HYPOTHESIS', 'CORROBORATED', 'AXIOM', 'CONTESTED',
                         'DERIVED', 'REFUTED', 'REJECTED', 'SUPERSEDED')),
@@ -30,6 +32,8 @@ CREATE TABLE genes (
     tau_at_promotion REAL,
     forage_cycles    INTEGER NOT NULL DEFAULT 0,
     stalled          INTEGER NOT NULL DEFAULT 0,
+    unintegrated     INTEGER NOT NULL DEFAULT 1,      -- D1: no qualifying typed connection yet
+    resonance        INTEGER CHECK (resonance BETWEEN -2 AND 2), -- D5: owner's mark; priority only, never read by the gate
     charter_id       TEXT REFERENCES charters(charter_id),
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL
@@ -48,6 +52,7 @@ CREATE TABLE gene_versions (
     scope        TEXT NOT NULL,   -- conditions, population, version, date range
     nuance       TEXT,
     rule         TEXT,            -- vyapti: the general rule a DERIVED gene relies on
+    prediction   TEXT,            -- D11: a novel, checkable consequence (required for DERIVED)
     valid_from   TEXT,
     valid_until  TEXT,
     author       TEXT NOT NULL,   -- 'agent:<model>' or 'human'
@@ -67,6 +72,9 @@ CREATE TABLE sources (
     blob_sha256   TEXT NOT NULL,
     lineage_id    TEXT NOT NULL,   -- sources sharing a lineage count once
     reliability   REAL NOT NULL DEFAULT 0.5 CHECK (reliability BETWEEN 0 AND 1),
+    transparency  REAL CHECK (transparency BETWEEN 0 AND 1), -- D10: shows data / methods / code
+    pred_hits     INTEGER NOT NULL DEFAULT 0,  -- D10: predictions of genes it supported that came true
+    pred_resolved INTEGER NOT NULL DEFAULT 0,
     license       TEXT
 );
 CREATE UNIQUE INDEX sources_blob ON sources(blob_sha256);
@@ -81,11 +89,34 @@ CREATE TABLE evidence (
                       'EXECUTED', 'OBSERVED', 'INFERRED', 'ABSENCE', 'TESTIMONY', 'ABDUCTION', 'ANALOGY')),
     quote          TEXT NOT NULL,
     quote_offset   INTEGER,
+    quote_sha256   TEXT,          -- of the normalised quote; shared quotes reveal shared lineage (D9)
     verified_quote INTEGER NOT NULL CHECK (verified_quote IN (0, 1)),
     added_at       TEXT NOT NULL,
     UNIQUE (gene_id, source_id, stance)
 );
 CREATE INDEX evidence_gene ON evidence(gene_id);
+CREATE INDEX evidence_quote ON evidence(quote_sha256);
+
+-- Genes that answer or bear on a research question (D1: an ANSWERS link counts as connection).
+CREATE TABLE charter_links (
+    gene_id    TEXT NOT NULL REFERENCES genes(gene_id),
+    charter_id TEXT NOT NULL REFERENCES charters(charter_id),
+    rel        TEXT NOT NULL CHECK (rel IN ('ANSWERS', 'BEARS_ON')),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (gene_id, charter_id, rel)
+);
+
+-- Calibration ledger (R5): checkable predictions and how they resolved.
+CREATE TABLE predictions (
+    prediction_id     TEXT PRIMARY KEY,
+    gene_id           TEXT NOT NULL REFERENCES genes(gene_id),
+    statement         TEXT NOT NULL,
+    support_at_making REAL NOT NULL,
+    resolve_after     TEXT,
+    outcome           TEXT CHECK (outcome IN ('HIT', 'MISS', 'VOID')),
+    resolved_at       TEXT,
+    made_at           TEXT NOT NULL
+);
 
 CREATE TABLE edges (
     edge_id    TEXT PRIMARY KEY,

@@ -6,6 +6,8 @@ Model
 -----
 * Evidence rows are grouped into independent lineages. Within a lineage only the
   strongest row per stance counts (w * r), so ten copies of one press release count once.
+  Independence must be shown, not presumed (D9): sources whose quotes share the same
+  passage are merged into one lineage even when their declared lineages differ.
 * support = 1 - prod(1 - w_i r_i) over lineages FOR; against likewise (noisy-OR).
 * Four-valued state (catuskoti / Belnap-Dunn): SUPPORTED, REFUTED, CONTESTED, UNKNOWN.
 * Gravity: in a topic with settled mass M, promotion needs
@@ -17,7 +19,8 @@ Model
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from .config import EvidenceWeights, GravityConfig
@@ -58,6 +61,8 @@ ENTRENCHED = {State.CORROBORATED, State.AXIOM}
 TERMINAL = {State.REJECTED, State.SUPERSEDED}
 # Frames that are not truth claims about the world never rise above HYPOTHESIS.
 CAPPED_FRAMES = {"SPECULATIVE", "METAPHOR"}
+SHINGLE_WORDS = 8
+SHARED_PASSAGE_JACCARD = 0.5
 
 
 @dataclass(frozen=True)
@@ -67,6 +72,40 @@ class EvidenceRow:
     evidence_type: str
     reliability: float
     verified_quote: bool
+    quote: str = ""
+
+
+def _shingles(text: str) -> set[tuple[str, ...]]:
+    words = re.findall(r"\w+", text.casefold())
+    if len(words) < SHINGLE_WORDS:
+        return {tuple(words)} if words else set()
+    return {tuple(words[i:i + SHINGLE_WORDS]) for i in range(len(words) - SHINGLE_WORDS + 1)}
+
+
+def shared_passage(a: str, b: str) -> bool:
+    """True when two quotes are substantially the same passage (copied or syndicated text)."""
+    sa, sb = _shingles(a), _shingles(b)
+    if not sa or not sb:
+        return False
+    return len(sa & sb) / len(sa | sb) >= SHARED_PASSAGE_JACCARD
+
+
+def group_lineages(rows: list[EvidenceRow]) -> list[EvidenceRow]:
+    """Union declared lineages that share a quoted passage; return rows relabelled by group (D9)."""
+    parent: dict[str, str] = {r.lineage_id: r.lineage_id for r in rows}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    quoted = [r for r in rows if r.quote]
+    for i, a in enumerate(quoted):
+        for b in quoted[i + 1:]:
+            if find(a.lineage_id) != find(b.lineage_id) and shared_passage(a.quote, b.quote):
+                parent[find(b.lineage_id)] = find(a.lineage_id)
+    return [replace(r, lineage_id=find(r.lineage_id)) for r in rows]
 
 
 @dataclass(frozen=True)
@@ -80,7 +119,7 @@ class Assessment:
 def assess(rows: list[EvidenceRow], weights: EvidenceWeights) -> Assessment:
     """Noisy-OR over independent lineages. Unverified quotes contribute nothing."""
     best: dict[tuple[str, str], float] = {}
-    for r in rows:
+    for r in group_lineages(rows):
         if not r.verified_quote:
             continue
         s = weights.of(r.evidence_type) * max(0.0, min(1.0, r.reliability))
@@ -126,11 +165,14 @@ def next_state(
     topic_mass: float,
     g: GravityConfig,
     ever_promoted: bool = False,
+    connected: bool = False,
 ) -> State:
     """Where the evidence puts a gene now. Never moves terminal or DERIVED genes (see derived_support).
 
     `ever_promoted` keeps the extra burden for overturning a once-settled gene even after
     it has slipped to CONTESTED, so it cannot be refuted on the cheaper path.
+    `connected` is D1: promotion needs evidence AND a qualifying typed connection. An
+    evidenced orphan waits in HYPOTHESIS (a percept not yet understood).
     """
     if current in TERMINAL or current == State.DERIVED:
         return current
@@ -155,12 +197,24 @@ def next_state(
         return State.CONTESTED
     if (
         frame not in CAPPED_FRAMES
+        and connected
         and a.lineages_for >= k
         and a.support >= t
         and a.against < g.holds
     ):
         return State.CORROBORATED
     return State.HYPOTHESIS
+
+
+def source_reliability(transparency: float | None, hits: int = 0, resolved: int = 0,
+                       prior_strength: float = 4.0) -> float:
+    """D10: trust is earned by showing percepts (data, methods, code) and by predictions that came true.
+
+    Agreement with the library is deliberately not an input. Base 0.3-0.7 from transparency,
+    then a Beta-style blend toward the observed hit rate as resolved predictions accumulate.
+    """
+    base = 0.5 if transparency is None else 0.3 + 0.4 * max(0.0, min(1.0, transparency))
+    return (hits + prior_strength * base) / (resolved + prior_strength)
 
 
 def derived_support(premise_supports: list[float]) -> float:

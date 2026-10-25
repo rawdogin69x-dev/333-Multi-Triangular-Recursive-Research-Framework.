@@ -42,6 +42,30 @@ class EvidenceWeights:
         return getattr(self, evidence_type)
 
 
+def _default_providers() -> dict:
+    # Cloud entries are absent by default: assumption A2, cloud spend is $0 until the owner sets a cap.
+    return {
+        "local-day": {"base_url": "http://127.0.0.1:8080/v1", "model": "local-day", "local": True},
+        "local-night": {"base_url": "http://127.0.0.1:8080/v1", "model": "local-night", "local": True},
+    }
+
+
+def _default_embedder() -> dict:
+    return {"base_url": "http://127.0.0.1:8081/v1", "model": "bge-m3"}
+
+
+@dataclass(frozen=True)
+class PipelineConfig:
+    distill_provider: str = "local-day"
+    judge_provider: str = "local-day"
+    judge_floor: float = 0.80
+    min_confidence_same: float = 0.75
+    neighbours: int = 5
+    max_claims_per_chunk: int = 8
+    use_grammar: bool = True
+    min_fetch_interval_s: float = 5.0
+
+
 @dataclass(frozen=True)
 class Config:
     db_path: str = "data/akashic_core.db"
@@ -52,6 +76,9 @@ class Config:
     max_forage_cycles: int = 2
     gravity: GravityConfig = field(default_factory=GravityConfig)
     weights: EvidenceWeights = field(default_factory=EvidenceWeights)
+    pipeline: PipelineConfig = field(default_factory=PipelineConfig)
+    providers: dict = field(default_factory=_default_providers)
+    embedder: dict = field(default_factory=_default_embedder)
 
 
 def load(path: str | Path | None = None) -> Config:
@@ -60,8 +87,9 @@ def load(path: str | Path | None = None) -> Config:
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     gravity = GravityConfig(**raw.pop("gravity", {}))
     weights = EvidenceWeights(**raw.pop("weights", {}))
+    pipeline = PipelineConfig(**raw.pop("pipeline", {}))
     known = {f.name for f in fields(Config)}
     unknown = set(raw) - known
     if unknown:
         raise ValueError(f"unknown config keys: {sorted(unknown)}")
-    return Config(gravity=gravity, weights=weights, **raw)
+    return Config(gravity=gravity, weights=weights, pipeline=pipeline, **raw)
